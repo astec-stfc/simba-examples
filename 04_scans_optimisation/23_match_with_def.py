@@ -12,10 +12,13 @@ Match line has a block
       variables: [JFEL-S13-MAG-QUAD-01, ..., -04]
       targets: {}
 
-Before tracking that line, SIMBA runs Ocelot's matcher on a copy of it,
-from the line's input beam. It varies the listed quads to hit the targets
-and writes their k1l back into the lattice. Then it tracks. The targets
-are filled in from code here, as JFEL's match_to_undulator.py does:
+When it loads that line's input beam, SIMBA's matching (simba.Modules.Matching)
+varies the listed quads to hit the targets, from that beam's Twiss, and writes
+their k1l into the lattice; then the line is written and tracked. The match
+runs in the line's own code, here Ocelot, with Ocelot's matcher; `code:` in
+the block picks another, and 06_matching shows the rest (every code, matrix
+targets, chicanes, the RF). Targets are SIMBA's Twiss names. They are filled
+in from code here, as JFEL's match_to_undulator.py does:
 
     framework["Match"].file_block["match"]["targets"] = {ELEMENT: {"beta_x": ..., ...}}
 

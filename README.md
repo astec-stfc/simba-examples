@@ -103,7 +103,7 @@ SIMBA's `main` yet).
 | 04 scans, optimisation | `20_quad_scan_emittance.py` | quad scan; thin-lens parabola and exact fits | fitted ε = the beam's ε (exact fit 1e-3, thin lens 5%) |
 | | `21_optimise_scipy.py` | `scipy.optimize` around `track()`; trial log; best setting to a changes file | optimum = thick-quad matrix optimum to 1e-4 |
 | | `22_optimise_compression.py` | JFEL L4H phase for 1000 A peak current; the same answer in other codes | 1000 A within 1%; without wakes Cheetah = Ocelot; wakes change I > 1.5x |
-| | `23_match_with_def.py` | `match:` block in a `.def` (Ocelot's matcher); periodic target from SIMBA | beam Twiss at the undulator = periodic Twiss; README table; stored S13 strengths |
+| | `23_match_with_def.py` | `match:` block in a `.def` (SIMBA's matching, in the line's code, Ocelot); periodic target from SIMBA | beam Twiss at the undulator = periodic Twiss; README table; stored S13 strengths |
 | | `24_parameter_scan_parallel.py` | angle × phase scan over processes, one directory per run, CSV | compression valley rises with the angle, within 5° of the README's |
 | 05 advanced | `25_collective_effects.py` | `csr_enable`, `lsc_enable`, `wakefield_enable`, one at a time, on JFEL's linac (Ocelot, elegant) | wakes shorten σz > 30%; CSR grows εx > 2x, not εy; README table |
 | | `26_injector_from_cathode.py` | JFEL's ASTRA injector from the cathode, seeded (B) | the saved S02 beam: energy, charge, σt, σx; ε within sampling |
@@ -113,11 +113,16 @@ SIMBA's `main` yet).
 | | `30_fel_genesis.py` | elegant linac into Genesis 4, steady-state (B) | λ = λu(1+K²)/(2γ²); gain length 1–2x Ming Xie; README row |
 | | `31_secondaries_bdsim.py` | `Target`, `Crystal`, secondaries as species; one species on to Xsuite (C) | E0 exp(−t/X0); README yields within statistics; channelled fraction |
 | | `32_bmad_multipass.py` | 28's ERL in Bmad, flattened and as Bmad multipass (C) | native = flattened to 1e-4; README Bmad column |
+| 06 matching | `33_match_in_any_code.py` | 23's match in each code (`code:`); the default, and a hand-over with its reason | the tracked beam on target in every code; Ocelot's = stored strengths |
+| | `34_matrix_targets.py` | `R12 = R34 = 0`: point-to-point imaging, in Xsuite's coordinates whatever the code | tracked R12, R34 < 1e-4 m (a fit with chromatic terms); Cheetah declines |
+| | `35_chicane_r56.py` | a chicane group's `angle` as the variable, for an R56 | angle back to 0.12 rad; tracked R56 to 1e-5; layout, edges, `dipoleangle` follow |
+| | `36_longitudinal_match.py` | `longitudinal_match`: linked S-band + X-band for a chirp, linearised; closing the loop | chirp 0.2%, curvature and skewness < 1% of nominal, with and without wakes |
+| | `37_compression_by_matching.py` | chicane R56 and RF together for C = 4, linear (curvature cancels T566) | 1/a1 = C to 2e-3; a2 < 2% of the uncompensated, which = R56 h2 + T566 h² |
 
 Notebooks: `01_basics/01_basics.ipynb`, `02_tracking/02_tracking.ipynb`,
 `03_modifying/03_modifying.ipynb`,
 `04_scans_optimisation/04_scans_optimisation.ipynb`,
-`05_advanced/05_advanced.ipynb`. Start Jupyter with
+`05_advanced/05_advanced.ipynb`, `06_matching/06_matching.ipynb`. Start Jupyter with
 `.venv/bin/jupyter lab`. The notebooks are committed without outputs.
 
 Each script writes its output to `output/<script name>/`, which git
@@ -150,6 +155,11 @@ Tested on 2026-11-07 (groups 02 to 05 on 2026-11-08) with:
 The examples use SIMBA's current names (`simba.Framework`, `loadSettings`,
 `beam.Particles`). An open SIMBA PR renames these in PEP-8 style, keeping
 the old names with a deprecation warning (see ISSUES.md).
+
+Group 06 (and the updated 23) use SIMBA's matching module
+(`simba.Modules.Matching`), on SIMBA's `feature/matching-overhaul` until it
+is released; tested on 2026-11-09 with that branch, LAURA `main` 2317300 and
+laura-lattices `main` fd4774d.
 
 ## Troubleshooting
 

@@ -35,14 +35,13 @@ The group's `.r56` property is the small-angle formula
 2 theta^2 (D + 2L/3), 1.1% below the exact value at 0.13 rad.
 
 set_angle also changes the geometry: in the middle straight the screen
-moves sideways to X = 2 rho (1 - cos(theta)) + D tan(theta). On SIMBA main,
-set_angle takes each dipole's length as its zero-angle (straight) length,
-while JFEL and every code take it as the arc. So set_angle at the current
-angle lengthens the dipoles by theta/sin(theta) - 1 (0.28% at 0.13 rad):
-ISSUES.md #27. The checks below use the lattice as it is after set_angle,
-so they hold either way.
+moves sideways to X = 2 rho (1 - cos(theta)) + D tan(theta). It keeps each
+dipole's entrance and exit along the axis where the lattice puts them, and
+the arc follows, so set_angle at the angle the chicane already has changes
+nothing (it once took the arc for the straight length: ISSUES.md #27).
 
-Check: in every code and at both angles, the tracked R56 must equal
+Checks: set_angle at the current angle keeps the dipoles' arc to 1e-9.
+In every code and at both angles, the tracked R56 must equal
 R56_path + S/gamma^2 to 2e-4 relative. The only noise is the second-order
 term T566 delta^2 (T566 ~ -1.5 R56), which the fit sees as scatter of
 ~3e-5 relative for 5000 particles; the measured difference is at most 7e-6. The
@@ -74,19 +73,16 @@ group = framework["bunch_compressor"]
 print(f"bunch_compressor: {type(group).__name__} of {list(group.elements)}")
 print(f"angle {group.angle} rad, r56 property {group.r56:.6f} m")
 
-# ISSUES.md #27: set_angle at the angle it already has should change nothing
+# set_angle at the angle it already has changes nothing (ISSUES.md #27, fixed)
 arc = framework[DIPOLES[0]].magnetic.length
 group.set_angle(group.angle)
-if abs(framework[DIPOLES[0]].magnetic.length / arc - 1) > 1e-9:
-    print(f"XFAIL #27: set_angle({group.angle}) changed the dipole arc from {arc:.6f} m "
-          f"to {framework[DIPOLES[0]].magnetic.length:.6f} m")
-else:
-    print("XPASS #27: set_angle at the current angle keeps the dipoles; remove this check and the note in ISSUES.md")
+same_arc = abs(framework[DIPOLES[0]].magnetic.length / arc - 1) <= 1e-9
+print(f"set_angle({group.angle}) keeps the dipole arc {arc:.6f} m: {same_arc}")
 
 # --- Track at two angles ----------------------------------------------------------
 print(f"\n{'code':8s} {'angle':>6s} {'R56 tracked':>12s} {'expected':>10s} {'rel diff':>9s} "
       f"{'r56 prop':>9s} {'screen x':>9s} {'expected':>9s}")
-problems = []
+problems = [] if same_arc else ["set_angle at the current angle changed the dipole arc"]
 for angle in (0.13, 0.10):
     for code in CODES:
         run = OUT / f"{code}_{angle}"
