@@ -1,0 +1,70 @@
+# An annotated SIMBA lattice definition (.def) file, read by 04_the_def_file.py.
+#
+# A .def file says how to simulate a machine: which stretch of the beam line
+# each code runs, where the first bunch comes from, and any settings that
+# differ from the lattice files. The machine itself (elements, sections,
+# layouts) lives in the LAURA YAML that the last three keys point at.
+#
+# Paths: relative ones ("./layouts.yaml") are relative to the master lattice,
+# the folder given as Framework(master_lattice=...). Inside values,
+# $master_lattice$ is replaced by that folder (with a trailing slash).
+#
+# SIMBA reads only the top-level keys used below (and `global`,
+# `functional_definitions`, `resolve_functional`); it ignores any other
+# top-level key without a warning, so check the spelling.
+
+# Optional: the bunch made at the cathode, for a first line that starts there
+# (ASTRA, GPT or OPAL). `default` names a set in the master lattice's
+# Generators/<generator_defaults> file (here jfel.yaml).
+generator:
+  code: astra
+  default: jfel_400_3ps
+
+# One entry per line, tracked in this order. The name is yours.
+files:
+  Compressor:
+    code: cheetah                 # the tracking code for this line
+    input:
+      # The bunch to start from: a beam file, named without its extension
+      # (SIMBA looks for <name>.openpmd.hdf5, then <name>.hdf5).
+      particle_definition: '$master_lattice$Data_Files/jfel_injector_S02'
+      # Optional: rematch the bunch to these Twiss values before tracking
+      # (beta in m). nemit_x / nemit_y (m rad) would also set the emittance.
+      twiss:
+        beta_x: 20
+        alpha_x: 0
+        beta_y: 10
+        alpha_y: 0
+    charge:
+      space_charge_mode: none     # none (or off), 2D or 3D, in the codes that model it
+    output:
+      # The line runs from start_element to end_element (both inclusive).
+      start_element: JFEL-S02-SIM-APER-01
+      end_element: JFEL-S06-SIM-MARK-01
+  Main:
+    code: ocelot
+    # No input: a line that starts where the previous one ended takes its
+    # beam from the previous line's output file.
+    output:
+      start_element: JFEL-S06-SIM-MARK-01
+      end_element: JFEL-FEL-SIM-MARK-01
+
+# Groups act on several elements together. A chicane group moves its four
+# dipoles (and what sits between them) when its angle is set.
+groups:
+  bunch_compressor:
+    type: chicane
+    elements: [JFEL-VBC-MAG-DIP-01, JFEL-VBC-MAG-DIP-02, JFEL-VBC-MAG-DIP-03, JFEL-VBC-MAG-DIP-04]
+
+# Changes from the lattice files, applied after loading: element (or group)
+# name -> attribute -> value. Units as in LAURA: phase in deg, k1l in 1/m.
+changes:
+  JFEL-L4H-LIN-CAV-01:
+    phase: -186.0
+  JFEL-S02-MAG-QUAD-01:
+    k1l: 1.25
+
+# The machine: LAURA layouts, sections and elements.
+layout: "./layouts.yaml"
+section: "./sections.yaml"
+element_list: "./YAML/"
