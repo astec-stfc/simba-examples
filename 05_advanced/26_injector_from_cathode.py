@@ -42,7 +42,6 @@ import argparse
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -56,21 +55,9 @@ IMAGE = "ghcr.io/astec-stfc/simcodes-docker:master"
 SCREEN = "JFEL-S02-SIM-APER-01"
 SAVED_PARTICLES, SEED = 32768, 1234
 
-parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+parser = argparse.ArgumentParser()
 parser.add_argument("--particles", type=int, default=4096)
 args = parser.parse_args()
-
-if not (shutil.which("docker") and subprocess.run(["docker", "image", "inspect", IMAGE],
-                                                  capture_output=True).returncode == 0):
-    print(f"SKIP: needs docker and {IMAGE} for ASTRA")
-    sys.exit(0)
-
-framework = fw.Framework(master_lattice=JFEL_DIR + "/", generator_defaults="/jfel.yaml", directory=str(OUT),
-                         clean=True, verbose=False, container_runtime="docker")
-framework.loadSettings("Lattices/jfel_combined.def")
-framework["generator"].number_of_particles = args.particles
-framework.setSeedValue(SEED)
-framework.track(endfile="injector400")
 
 
 def summary(beam):
@@ -80,20 +67,31 @@ def summary(beam):
             "sigma_t [ps]": np.std(beam.t.val) * 1e12, "sigma_x [mm]": np.std(beam.x.val) * 1e3}
 
 
-run = summary(rbf.load_file(str(OUT / f"{SCREEN}.openpmd.hdf5")))
-saved = summary(rbf.load_file(os.path.join(JFEL_DIR, "Data_Files", "jfel_injector_S02.openpmd.hdf5")))
-print(f"\nAt {SCREEN}:")
-print(f"{'':14s} {f'this run ({args.particles})':>18s} {f'saved ({SAVED_PARTICLES})':>15s} {'rel diff':>9s}")
-for key in run:
-    print(f"{key:14s} {run[key]:18.4f} {saved[key]:15.4f} {run[key] / saved[key] - 1:9.1e}")
+if not (shutil.which("docker") and subprocess.run(["docker", "image", "inspect", IMAGE],
+                                                  capture_output=True).returncode == 0):
+    print(f"SKIP: needs docker and {IMAGE} for ASTRA")
+else:  # not sys.exit(0): in a notebook that is an error and stops "Run All"
+    framework = fw.Framework(master_lattice=JFEL_DIR + "/", generator_defaults="/jfel.yaml", directory=str(OUT),
+                             clean=True, verbose=False, container_runtime="docker")
+    framework.loadSettings("Lattices/jfel_combined.def")
+    framework["generator"].number_of_particles = args.particles
+    framework.setSeedValue(SEED)
+    framework.track(endfile="injector400")
 
-# --- Checks ----------------------------------------------------------------
-eps_tol = 0.15 if args.particles < 16384 else 0.02
-limits = {"E [MeV]": 1e-3, "Q [pC]": 1e-9, "sigma_t [ps]": 0.02, "sigma_x [mm]": 0.03,
-          "eps_nx [um]": eps_tol, "eps_ny [um]": eps_tol}
-if args.particles == SAVED_PARTICLES:
-    limits = dict.fromkeys(limits, 1e-9)
-bad = [f"{k}: {run[k]:.4f} against {saved[k]:.4f}" for k, tol in limits.items() if abs(run[k] / saved[k] - 1) > tol]
-assert not bad, "\n".join(bad)
-print(f"\nOK: {run['E [MeV]']:.1f} MeV, {run['Q [pC]']:.0f} pC, eps_n {run['eps_nx [um]']:.2f} um from the cathode"
-      + (" (the saved beam, exactly)" if args.particles == SAVED_PARTICLES else ""))
+    run = summary(rbf.load_file(str(OUT / f"{SCREEN}.openpmd.hdf5")))
+    saved = summary(rbf.load_file(os.path.join(JFEL_DIR, "Data_Files", "jfel_injector_S02.openpmd.hdf5")))
+    print(f"\nAt {SCREEN}:")
+    print(f"{'':14s} {f'this run ({args.particles})':>18s} {f'saved ({SAVED_PARTICLES})':>15s} {'rel diff':>9s}")
+    for key in run:
+        print(f"{key:14s} {run[key]:18.4f} {saved[key]:15.4f} {run[key] / saved[key] - 1:9.1e}")
+
+    # --- Checks ------------------------------------------------------------
+    eps_tol = 0.15 if args.particles < 16384 else 0.02
+    limits = {"E [MeV]": 1e-3, "Q [pC]": 1e-9, "sigma_t [ps]": 0.02, "sigma_x [mm]": 0.03,
+              "eps_nx [um]": eps_tol, "eps_ny [um]": eps_tol}
+    if args.particles == SAVED_PARTICLES:
+        limits = dict.fromkeys(limits, 1e-9)
+    bad = [f"{k}: {run[k]:.4f} against {saved[k]:.4f}" for k, tol in limits.items() if abs(run[k] / saved[k] - 1) > tol]
+    assert not bad, "\n".join(bad)
+    print(f"\nOK: {run['E [MeV]']:.1f} MeV, {run['Q [pC]']:.0f} pC, eps_n {run['eps_nx [um]']:.2f} um from the cathode"
+          + (" (the saved beam, exactly)" if args.particles == SAVED_PARTICLES else ""))

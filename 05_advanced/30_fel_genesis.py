@@ -43,7 +43,6 @@ Checks:
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import h5py
@@ -87,46 +86,45 @@ def ming_xie(beam, period, K):
 
 if not docker_ready():
     print(f"SKIP: needs docker and {IMAGE} (elegant and Genesis)")
-    sys.exit(0)
+else:  # not sys.exit(0): in a notebook that is an error and stops "Run All"
+    f = fw.Framework(master_lattice=JFEL_DIR + "/", directory=str(OUT), clean=True, verbose=False,
+                     container_runtime="docker")
+    f.loadSettings("Lattices/jfel_fel.def")
+    f.track(files=["Linac", "FEL_ST"], check_lattice=False)
 
-f = fw.Framework(master_lattice=JFEL_DIR + "/", directory=str(OUT), clean=True, verbose=False,
-                 container_runtime="docker")
-f.loadSettings("Lattices/jfel_fel.def")
-f.track(files=["Linac", "FEL_ST"], check_lattice=False)
+    undulator = f.getElement("JFEL-FEL-MAG-WIGG-01").magnetic
+    period, K = float(undulator.period), float(undulator.strength)
+    assert undulator.helical, "the formulas here are for a helical undulator"
+    xie = ming_xie(rbf.load_file(str(OUT / f"{ENTRANCE}.openpmd.hdf5")), period, K)
+    lam_formula = period * (1 + K ** 2) / (2 * xie["gamma"] ** 2)
 
-undulator = f.getElement("JFEL-FEL-MAG-WIGG-01").magnetic
-period, K = float(undulator.period), float(undulator.strength)
-assert undulator.helical, "the formulas here are for a helical undulator"
-xie = ming_xie(rbf.load_file(str(OUT / f"{ENTRANCE}.openpmd.hdf5")), period, K)
-lam_formula = period * (1 + K ** 2) / (2 * xie["gamma"] ** 2)
+    with h5py.File(OUT / "FEL_ST.out.h5") as h:
+        z, power = h["Lattice/zplot"][()], h["Field/power"][()][:, 0]
+        lam_genesis = float(h["Global/lambdaref"][()][0])
+    peak = int(np.argmax(power))
+    exponential = (power > 1e-4 * power[peak]) & (power < 1e-2 * power[peak]) & (np.arange(len(z)) < peak)
+    lg = 1 / np.polyfit(z[exponential], np.log(power[exponential]), 1)[0]
 
-with h5py.File(OUT / "FEL_ST.out.h5") as h:
-    z, power = h["Lattice/zplot"][()], h["Field/power"][()][:, 0]
-    lam_genesis = float(h["Global/lambdaref"][()][0])
-peak = int(np.argmax(power))
-exponential = (power > 1e-4 * power[peak]) & (power < 1e-2 * power[peak]) & (np.arange(len(z)) < peak)
-lg = 1 / np.polyfit(z[exponential], np.log(power[exponential]), 1)[0]
+    print(f"\nbeam at the undulator: I_peak {xie['current']:.0f} A, gamma {xie['gamma']:.1f}, rho {xie['rho']:.4f}")
+    print(f"wavelength: Genesis {lam_genesis * 1e6:.4f} um, formula {lam_formula * 1e6:.4f} um "
+          f"({lam_genesis / lam_formula - 1:+.1e}); K {K}, period {period} m")
+    print(f"gain length: Genesis {lg:.3f} m, Ming Xie {xie['Lg']:.3f} m, 1D {xie['Lg1d']:.3f} m "
+          f"(Genesis / Ming Xie = {lg / xie['Lg']:.2f})")
+    print(f"power: {power[peak]:.3e} W at most (z = {z[peak]:.1f} m), {power[-1]:.3e} W at the exit")
+    print(f"README: lambda {README['lambda'] * 1e6} um, L_g {README['Lg']} m, Ming Xie {README['Lg_xie']} m, "
+          f"{README['P_end']:.1e} W at the exit")
 
-print(f"\nbeam at the undulator: I_peak {xie['current']:.0f} A, gamma {xie['gamma']:.1f}, rho {xie['rho']:.4f}")
-print(f"wavelength: Genesis {lam_genesis * 1e6:.4f} um, formula {lam_formula * 1e6:.4f} um "
-      f"({lam_genesis / lam_formula - 1:+.1e}); K {K}, period {period} m")
-print(f"gain length: Genesis {lg:.3f} m, Ming Xie {xie['Lg']:.3f} m, 1D {xie['Lg1d']:.3f} m "
-      f"(Genesis / Ming Xie = {lg / xie['Lg']:.2f})")
-print(f"power: {power[peak]:.3e} W at most (z = {z[peak]:.1f} m), {power[-1]:.3e} W at the exit")
-print(f"README: lambda {README['lambda'] * 1e6} um, L_g {README['Lg']} m, Ming Xie {README['Lg_xie']} m, "
-      f"{README['P_end']:.1e} W at the exit")
-
-# --- Checks ----------------------------------------------------------------
-problems = []
-if abs(lam_genesis / lam_formula - 1) > 1e-3:
-    problems.append(f"wavelength {lam_genesis:.5e}, formula {lam_formula:.5e}")
-if lg < xie["Lg1d"]:
-    problems.append(f"gain length {lg:.3f} m shorter than the 1D one {xie['Lg1d']:.3f} m")
-if not 1 <= lg / xie["Lg"] <= 2:
-    problems.append(f"gain length {lg:.3f} m, {lg / xie['Lg']:.2f}x Ming Xie's")
-for got, key, limit in ((lam_genesis, "lambda", 1e-3), (lg, "Lg", 0.02), (xie["Lg"], "Lg_xie", 0.02),
-                        (power[-1], "P_end", 0.05)):
-    if abs(got / README[key] - 1) > limit:
-        problems.append(f"{key}: {got:.4g}, README {README[key]}")
-assert not problems, "\n".join(problems)
-print("\nOK: the resonant wavelength, a gain length between 1x and 2x Ming Xie's, and the README's row")
+    # --- Checks ------------------------------------------------------------
+    problems = []
+    if abs(lam_genesis / lam_formula - 1) > 1e-3:
+        problems.append(f"wavelength {lam_genesis:.5e}, formula {lam_formula:.5e}")
+    if lg < xie["Lg1d"]:
+        problems.append(f"gain length {lg:.3f} m shorter than the 1D one {xie['Lg1d']:.3f} m")
+    if not 1 <= lg / xie["Lg"] <= 2:
+        problems.append(f"gain length {lg:.3f} m, {lg / xie['Lg']:.2f}x Ming Xie's")
+    for got, key, limit in ((lam_genesis, "lambda", 1e-3), (lg, "Lg", 0.02), (xie["Lg"], "Lg_xie", 0.02),
+                            (power[-1], "P_end", 0.05)):
+        if abs(got / README[key] - 1) > limit:
+            problems.append(f"{key}: {got:.4g}, README {README[key]}")
+    assert not problems, "\n".join(problems)
+    print("\nOK: the resonant wavelength, a gain length between 1x and 2x Ming Xie's, and the README's row")

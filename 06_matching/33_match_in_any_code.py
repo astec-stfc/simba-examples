@@ -44,7 +44,6 @@ Checks:
 - The Cheetah line hands over with a warning, and its match meets the target too.
 """
 
-import sys
 import warnings
 from pathlib import Path
 
@@ -113,4 +112,3 @@ if not handover:
     problems.append("no hand-over warning")
 assert not problems, f"failed: {problems}"
 print(f"\nOK: {len(results) - 1} codes match the beam onto the undulator, and the Cheetah line hands over")
-sys.exit(0)

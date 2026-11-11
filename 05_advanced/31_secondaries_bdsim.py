@@ -53,7 +53,6 @@ Checks (measured values from one run, against SIMBA and LAURA main):
 import importlib.util
 import os
 import shutil
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -95,40 +94,39 @@ def run(lattice):
 
 if not shutil.which("bdsim") or importlib.util.find_spec("pybdsim") is None or importlib.util.find_spec("ROOT") is None:
     print("SKIP: needs bdsim on PATH, ROOT's Python bindings and pybdsim (source thisroot.sh and bdsim.sh)")
-    sys.exit(0)
+else:  # not sys.exit(0): in a notebook that is an error and stops "Run All"
+    results = {lattice: run(lattice) for lattice in ("brems_target", "positron_conversion", "crystal_channelling")}
+    for lattice, (electrons, points) in results.items():
+        print(f"\n{lattice} (incoming: {electrons:.3g} electrons, as 2000 macroparticles)")
+        for point, by_species in points.items():
+            for s, (n, e, xp) in by_species.items():
+                print(f"  {point:22s} {s:9s} {n:7.3f} per e-   <E> {e:8.2f} MeV   x' median {np.median(xp):7.3f} mrad")
 
-results = {lattice: run(lattice) for lattice in ("brems_target", "positron_conversion", "crystal_channelling")}
-for lattice, (electrons, points) in results.items():
-    print(f"\n{lattice} (incoming: {electrons:.3g} electrons, as 2000 macroparticles)")
-    for point, by_species in points.items():
-        for s, (n, e, xp) in by_species.items():
-            print(f"  {point:22s} {s:9s} {n:7.3f} per e-   <E> {e:8.2f} MeV   x' median {np.median(xp):7.3f} mrad")
+    brems = results["brems_target"][1]["SEC-BREMS-TGT-01"]
+    conv_points = results["positron_conversion"][1]
+    conversion, screen = conv_points["SEC-CONV-SIM-END-01"], conv_points["SEC-CONV-DIA-SCR-01"]
+    crystal_xp = results["crystal_channelling"][1]["SEC-CRY-DIA-SCR-01"]["electron"][2]
+    channelled = np.mean(np.abs(crystal_xp - 0.9) < 0.15)
+    expected_energy = 100.0 * np.exp(-1e-3 / X0_W)
+    print(f"\nbrems: electrons' <E> {brems['electron'][1]:.2f} MeV, E0 exp(-t/X0) {expected_energy:.2f} MeV")
+    print(f"crystal: channelled fraction {channelled:.3f} (mean of 15 runs 0.085; README 0.093)")
 
-brems = results["brems_target"][1]["SEC-BREMS-TGT-01"]
-conv_points = results["positron_conversion"][1]
-conversion, screen = conv_points["SEC-CONV-SIM-END-01"], conv_points["SEC-CONV-DIA-SCR-01"]
-crystal_xp = results["crystal_channelling"][1]["SEC-CRY-DIA-SCR-01"]["electron"][2]
-channelled = np.mean(np.abs(crystal_xp - 0.9) < 0.15)
-expected_energy = 100.0 * np.exp(-1e-3 / X0_W)
-print(f"\nbrems: electrons' <E> {brems['electron'][1]:.2f} MeV, E0 exp(-t/X0) {expected_energy:.2f} MeV")
-print(f"crystal: channelled fraction {channelled:.3f} (mean of 15 runs 0.085; README 0.093)")
-
-# --- Checks ----------------------------------------------------------------
-problems = []
-checks = [  # (what, got, low, high)
-    ("brems e- <E> [MeV]", brems["electron"][1], expected_energy * 0.97, expected_energy * 1.03),
-    ("brems e- per e-", brems["electron"][0], 0.979, 0.999),
-    ("brems photons per e-", brems["photon"][0], 2.03 - 0.16, 2.03 + 0.16),
-    ("brems e+ per e-", brems.get("positron", (0,))[0], 0.038 - 0.022, 0.038 + 0.022),
-    ("conversion e+ per e-", conversion["positron"][0], 0.82, 0.89),
-    ("conversion photons per e-", conversion["photon"][0], 11.5, 12.1),
-    ("crystal channelled", channelled, 0.085 - 0.035, 0.085 + 0.035),
-]
-for what, got, low, high in checks:
-    if not low <= got <= high:
-        problems.append(f"{what}: {got:.4f}, expected {low:.4f} to {high:.4f}")
-tracked = [s for s in screen if s != "photon"]  # photons are carried through untracked
-if tracked != ["positron"]:
-    problems.append(f"the Xsuite screen has {tracked}, expected the positrons alone")
-assert not problems, "\n".join(problems)
-print("\nOK: the radiation loss, the yields and the channelled fraction are as expected")
+    # --- Checks ------------------------------------------------------------
+    problems = []
+    checks = [  # (what, got, low, high)
+        ("brems e- <E> [MeV]", brems["electron"][1], expected_energy * 0.97, expected_energy * 1.03),
+        ("brems e- per e-", brems["electron"][0], 0.979, 0.999),
+        ("brems photons per e-", brems["photon"][0], 2.03 - 0.16, 2.03 + 0.16),
+        ("brems e+ per e-", brems.get("positron", (0,))[0], 0.038 - 0.022, 0.038 + 0.022),
+        ("conversion e+ per e-", conversion["positron"][0], 0.82, 0.89),
+        ("conversion photons per e-", conversion["photon"][0], 11.5, 12.1),
+        ("crystal channelled", channelled, 0.085 - 0.035, 0.085 + 0.035),
+    ]
+    for what, got, low, high in checks:
+        if not low <= got <= high:
+            problems.append(f"{what}: {got:.4f}, expected {low:.4f} to {high:.4f}")
+    tracked = [s for s in screen if s != "photon"]  # photons are carried through untracked
+    if tracked != ["positron"]:
+        problems.append(f"the Xsuite screen has {tracked}, expected the positrons alone")
+    assert not problems, "\n".join(problems)
+    print("\nOK: the radiation loss, the yields and the channelled fraction are as expected")

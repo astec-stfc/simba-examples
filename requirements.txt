@@ -1,8 +1,8 @@
-# The commits these examples are tested against (SIMBA, LAURA and laura-lattices main, 2026-11-07).
+# The commits these examples are tested against (SIMBA, LAURA and laura-lattices main, 2026-11-10).
 # For development, prefer the editable clones described in README.md; this file is the pinned alternative.
 laura-accelerator @ git+https://github.com/astec-stfc/laura@23173000944c342a3669ad8fba5a6e03ff3af2bc
 simba-accelerator[simcodes] @ git+https://github.com/astec-stfc/simba@26aed743a82b3816639620e458787c08d2a06ac3
-laura-lattices @ git+https://github.com/astec-stfc/laura-lattices@fd4774ded07ba2e171d54ae32eba0e6658dc9ca1
+laura-lattices @ git+https://github.com/astec-stfc/laura-lattices@b0cf4d8f563273007dbcacef591ee41a36bfe88f
 jupyter
 nbconvert
 ipykernel

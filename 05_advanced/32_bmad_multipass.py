@@ -40,7 +40,6 @@ Checks:
 
 import importlib.util
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -81,30 +80,29 @@ def track(native):
 
 if not os.path.isfile(LIBTAO) or importlib.util.find_spec("pytao") is None:
     print("SKIP: needs pytao and $ACC_ROOT_DIR/production/lib/libtao.so (export ACC_ROOT_DIR)")
-    sys.exit(0)
+else:  # not sys.exit(0): in a notebook that is an error and stops "Run All"
+    flattened, native = track(False), track(True)
+    print("Bmad multipass in the native lattice (ERL.bmad):")
+    for line in (native / "ERL.bmad").read_text().splitlines():
+        if "line[multipass]" in line or "RF_CAV_01\\" in line:
+            print("   ", line[:100] + (" ..." if len(line) > 100 else ""))
 
-flattened, native = track(False), track(True)
-print("Bmad multipass in the native lattice (ERL.bmad):")
-for line in (native / "ERL.bmad").read_text().splitlines():
-    if "line[multipass]" in line or "RF_CAV_01\\" in line:
-        print("   ", line[:100] + (" ..." if len(line) > 100 else ""))
+    at = {"flattened": summary(flattened / f"{SCREEN}.openpmd.hdf5"), "native": summary(native / f"{SCREEN}.openpmd.hdf5")}
+    points = {k: summary(flattened / f"{p}.openpmd.hdf5") for k, p in POINTS.items()}
+    print(f"\n{'':22s}" + "".join(f"{q:>10s}" for q in QUANTITIES))
+    for name, s in [(f"screen, {k}", v) for k, v in at.items()] + [(f"flattened, {k}", v) for k, v in points.items()]:
+        print(f"{name:22s}" + "".join(f"{s[q]:10.4g}" for q in QUANTITIES))
 
-at = {"flattened": summary(flattened / f"{SCREEN}.openpmd.hdf5"), "native": summary(native / f"{SCREEN}.openpmd.hdf5")}
-points = {k: summary(flattened / f"{p}.openpmd.hdf5") for k, p in POINTS.items()}
-print(f"\n{'':22s}" + "".join(f"{q:>10s}" for q in QUANTITIES))
-for name, s in [(f"screen, {k}", v) for k, v in at.items()] + [(f"flattened, {k}", v) for k, v in points.items()]:
-    print(f"{name:22s}" + "".join(f"{s[q]:10.4g}" for q in QUANTITIES))
-
-# --- Checks ----------------------------------------------------------------
-problems = []
-worst = max(abs(at["native"][q] / at["flattened"][q] - 1) for q in QUANTITIES)
-print(f"\nnative against flattened at the screen: largest relative difference {worst:.1e}")
-if worst > 1e-4:
-    problems.append(f"native multipass differs from the flattened lattice by {worst:.1e}")
-for point, refs in README.items():
-    for q, ref in refs.items():
-        limit = 1e-4 if q == "p" else 0.01
-        if abs(points[point][q] / ref - 1) > limit:
-            problems.append(f"{point} {q}: {points[point][q]:.5g}, README {ref}")
-assert not problems, "\n".join(problems)
-print("OK: Bmad multipass equals the flattened lattice, and the README's Bmad column is reproduced")
+    # --- Checks ------------------------------------------------------------
+    problems = []
+    worst = max(abs(at["native"][q] / at["flattened"][q] - 1) for q in QUANTITIES)
+    print(f"\nnative against flattened at the screen: largest relative difference {worst:.1e}")
+    if worst > 1e-4:
+        problems.append(f"native multipass differs from the flattened lattice by {worst:.1e}")
+    for point, refs in README.items():
+        for q, ref in refs.items():
+            limit = 1e-4 if q == "p" else 0.01
+            if abs(points[point][q] / ref - 1) > limit:
+                problems.append(f"{point} {q}: {points[point][q]:.5g}, README {ref}")
+    assert not problems, "\n".join(problems)
+    print("OK: Bmad multipass equals the flattened lattice, and the README's Bmad column is reproduced")

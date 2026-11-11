@@ -124,6 +124,10 @@ Notebooks: `01_basics/01_basics.ipynb`, `02_tracking/02_tracking.ipynb`,
 `04_scans_optimisation/04_scans_optimisation.ipynb`,
 `05_advanced/05_advanced.ipynb`, `06_matching/06_matching.ipynb`. Start Jupyter with
 `.venv/bin/jupyter lab`. The notebooks are committed without outputs.
+Each notebook holds its scripts' code, one script per cell, with the
+explanation between them. The scripts are the source: after changing one,
+run `.venv/bin/python sync_notebooks.py` to copy it into its notebook
+(`check_all.py` fails if a notebook is out of date).
 
 Each script writes its output to `output/<script name>/`, which git
 ignores, and never writes into the lattice packages.
@@ -144,22 +148,22 @@ Logs go to `output/check_all/`.
 
 ## Versions
 
-Tested on 2026-11-07 (groups 02 to 05 on 2026-11-08) with:
+Tested again, scripts and notebooks, on 2026-11-10 with:
 
 | Package | Commit | Version |
 |---------|--------|---------|
 | SIMBA `main` | 26aed74 | 0.7.1.post5 |
 | LAURA `main` | 2317300 | 1.1.5 |
-| laura-lattices `main` | fd4774d | 1.0.0 |
+| laura-lattices `main` | b0cf4d8 | 1.0.0 |
 
 The examples use SIMBA's current names (`simba.Framework`, `loadSettings`,
 `beam.Particles`). An open SIMBA PR renames these in PEP-8 style, keeping
 the old names with a deprecation warning (see ISSUES.md).
 
-Group 06 (and the updated 23) use SIMBA's matching module
+Group 06 (and the updated 16 and 23) use SIMBA's matching module
 (`simba.Modules.Matching`), on SIMBA's `feature/matching-overhaul` until it
-is released; tested on 2026-11-09 with that branch, LAURA `main` 2317300 and
-laura-lattices `main` fd4774d.
+is released; on SIMBA `main`, 33-37 and 16 fail. Tested on 2026-11-10 with
+that branch (b53cef8), LAURA `main` 2317300 and laura-lattices `main` b0cf4d8.
 
 ## Troubleshooting
 

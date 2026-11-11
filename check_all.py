@@ -1,5 +1,6 @@
 """
-Run every example script, each in a fresh Python process, and then the
+Run every example script, each in a fresh Python process, check that the
+notebooks hold the current scripts (sync_notebooks.py --check), and run the
 group notebooks; print a summary table.
 
     python check_all.py                 # tiers A and B (B is skipped without a container runtime)
@@ -81,6 +82,10 @@ def main():
         rows.append((name, t, "FAIL" if code else "pass", notes, took))
         print(f"{rows[-1][2]:4s} {name} ({took:.0f} s)", flush=True)
 
+    if notebooks:
+        sync = subprocess.run([sys.executable, str(ROOT / "sync_notebooks.py"), "--check"], capture_output=True, text=True)
+        failed |= bool(sync.returncode)
+        rows.append(("sync_notebooks.py --check", "-", "FAIL" if sync.returncode else "pass", sync.stdout.strip()[:100], 0))
     for nb in notebooks:
         name = nb.relative_to(ROOT).as_posix()
         start = time.time()
@@ -92,13 +97,7 @@ def main():
         took = time.time() - start
         (LOGS / f"{nb.stem}.nbconvert.log").write_text(run.stdout + run.stderr)
         note = run.stderr.strip().splitlines()[-1][:100] if run.returncode else ""
-        if not run.returncode:
-            # %run catches a script's exception and shows it, so nbconvert succeeds: look for error outputs.
-            import nbformat
-            errors = [o for c in nbformat.read(LOGS / nb.name, 4).cells for o in c.get("outputs", [])
-                      if o.get("output_type") == "error"]
-            note = f"{len(errors)} cell(s) raised; first: {errors[0]['ename']}: {errors[0]['evalue']}"[:100] if errors else ""
-        bad = bool(run.returncode or note)
+        bad = bool(run.returncode)
         failed |= bad
         rows.append((name, "-", "FAIL" if bad else "pass", note, took))
         print(f"{rows[-1][2]:4s} {name} ({took:.0f} s)", flush=True)
